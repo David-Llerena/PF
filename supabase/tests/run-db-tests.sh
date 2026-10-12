@@ -8,3 +8,5 @@ DIR="$(cd "$(dirname "$0")/.." && pwd)"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$DIR/tests/_supabase_stub.sql"
 for f in "$DIR"/migrations/*.sql; do psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$f"; done
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$DIR/tests/financial_rules.test.sql"
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$DIR/tests/phase2_rules.test.sql"
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$DIR/tests/phase3_rules.test.sql"

@@ -59,6 +59,7 @@ export async function createExpense(input: unknown): Promise<ActionResult> {
       direction: directionFor("expense"),
       status: v.status,
       account_id: v.account_id,
+      credit_card_id: v.credit_card_id,
       category_id: v.category_id,
       amount: v.amount,
       occurred_on: v.occurred_on,
@@ -70,7 +71,11 @@ export async function createExpense(input: unknown): Promise<ActionResult> {
     if (error) return dbError(error);
 
     revalidateFinance();
-    return { ok: true, message: v.status === "pending" ? "Gasto programado" : "Gasto registrado" };
+    return {
+      ok: true,
+      message:
+        v.status === "pending" ? "Gasto programado" : v.credit_card_id ? "Consumo con tarjeta registrado" : "Gasto registrado",
+    };
   });
 }
 
@@ -150,8 +155,8 @@ export async function updateTransaction(
       if (!p.success) return validationError(p.error);
       const v = p.data;
       patch = {
-        status: v.status, account_id: v.account_id, category_id: v.category_id, amount: v.amount,
-        occurred_on: v.occurred_on, description: v.description, notes: v.notes,
+        status: v.status, account_id: v.account_id, credit_card_id: v.credit_card_id, category_id: v.category_id,
+        amount: v.amount, occurred_on: v.occurred_on, description: v.description, notes: v.notes,
         payment_method: v.payment_method, expense_type: v.expense_type,
       };
     } else {
@@ -202,7 +207,9 @@ export async function confirmTransaction(input: unknown): Promise<ActionResult> 
 
 /**
  * Anula un movimiento. No se borra físicamente: queda en el historial y
- * en la auditoría, y deja de afectar saldos y reportes.
+ * en la auditoría, y deja de afectar saldos y reportes. Si pertenece a un
+ * pago agrupado (préstamo) o a una compra diferida, se anula el conjunto
+ * completo para mantener la consistencia (lo resuelve la base de datos).
  */
 export async function voidTransaction(input: unknown): Promise<ActionResult> {
   return runAction(async () => {
@@ -210,17 +217,10 @@ export async function voidTransaction(input: unknown): Promise<ActionResult> {
     if (!parsed.success) return validationError(parsed.error);
     const { supabase } = await requireUser();
 
-    const { data, error } = await supabase
-      .from("financial_transactions")
-      .update({ status: "void" })
-      .eq("id", parsed.data.id)
-      .neq("status", "void")
-      .neq("kind", "opening") // el saldo inicial se cambia desde la cuenta
-      .select("id");
+    const { data, error } = await supabase.rpc("void_transaction", { p_id: parsed.data.id });
     if (error) return dbError(error);
-    if (!data?.length) return { ok: false, error: "No se pudo anular este movimiento." };
 
     revalidateFinance();
-    return { ok: true, message: "Movimiento anulado" };
+    return { ok: true, message: Number(data) > 1 ? `Se anularon ${data} movimientos relacionados` : "Movimiento anulado" };
   });
 }

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { LogOut, ShieldCheck } from "lucide-react";
+import { Download, LogOut, ShieldCheck } from "lucide-react";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { getAccountsWithBalances, getCategories, getProfile } from "@/services/finance";
 import { PageHeader } from "@/components/layout/page-header";
@@ -61,6 +61,12 @@ export default async function SettingsPage() {
                 almacena credenciales bancarias, números completos de tarjeta, CVV ni PIN.
               </p>
             </div>
+            <a
+              href="/api/export"
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border bg-card text-sm font-medium hover:bg-muted"
+            >
+              <Download className="size-4" /> Descargar mis movimientos (CSV)
+            </a>
             <form action={signOut}>
               <Button type="submit" variant="outline" className="w-full">
                 <LogOut /> Cerrar sesión

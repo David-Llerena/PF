@@ -13,7 +13,7 @@ export type LedgerEntry = {
   status: TransactionStatus;
   amount: MoneyInput;
   direction: 1 | -1;
-  account_id: string;
+  account_id: string | null;
   counter_account_id: string | null;
 };
 
@@ -29,7 +29,7 @@ export function affectsBalance(entry: Pick<LedgerEntry, "status">): boolean {
 export function effectOnAccount(entry: LedgerEntry, accountId: string): Decimal {
   if (!affectsBalance(entry)) return new Decimal(0);
   const amount = money(entry.amount);
-  if (entry.account_id === accountId) return amount.times(entry.direction);
+  if (entry.account_id && entry.account_id === accountId) return amount.times(entry.direction);
   if (entry.kind === "transfer" && entry.counter_account_id === accountId) return amount;
   return new Decimal(0);
 }
@@ -75,9 +75,13 @@ export function financialPosition(params: {
 export function directionFor(kind: TransactionKind, adjustmentSign: 1 | -1 = 1): 1 | -1 {
   switch (kind) {
     case "income":
+    case "loan_disbursement":
       return 1;
     case "expense":
     case "transfer":
+    case "card_opening":
+    case "card_payment":
+    case "loan_payment":
       return -1;
     case "opening":
     case "adjustment":

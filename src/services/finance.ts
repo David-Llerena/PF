@@ -11,12 +11,14 @@ import type { AccountWithBalance, Category, Institution, Profile, Transaction } 
  * Los importes se piden como texto (`::text`) para no perder precisión.
  */
 
-const TX_SELECT = `
+export const TX_SELECT = `
   id, kind, status, account_id, counter_account_id, category_id,
+  credit_card_id, card_purchase_id, loan_id, payment_group_id, payment_kind,
   amount:amount::text, direction, occurred_on, description, notes,
   payment_method, expense_type, reason, is_demo, created_at,
   account:accounts!financial_transactions_account_id_fkey(name, color),
   counter_account:accounts!financial_transactions_counter_account_id_fkey(name, color),
+  credit_card:credit_cards(name, color),
   category:transaction_categories(name, color, icon)
 `;
 
@@ -81,7 +83,9 @@ export async function getCategories(supabase: SupabaseClient, opts: { includeIna
 export type TransactionFilters = {
   from?: string;
   to?: string;
-  kind?: "income" | "expense" | "transfer" | "adjustment" | "opening";
+  kind?: Transaction["kind"];
+  creditCardId?: string;
+  loanId?: string;
   status?: "pending" | "confirmed" | "void";
   accountId?: string;
   categoryId?: string;
@@ -111,6 +115,8 @@ export async function getTransactions(supabase: SupabaseClient, f: TransactionFi
   if (f.status) q = q.eq("status", f.status);
   else if (!f.includeVoid) q = q.neq("status", "void");
   if (f.accountId && UUID_RE.test(f.accountId)) q = q.or(`account_id.eq.${f.accountId},counter_account_id.eq.${f.accountId}`);
+  if (f.creditCardId && UUID_RE.test(f.creditCardId)) q = q.eq("credit_card_id", f.creditCardId);
+  if (f.loanId && UUID_RE.test(f.loanId)) q = q.eq("loan_id", f.loanId);
   if (f.categoryId && UUID_RE.test(f.categoryId)) q = q.eq("category_id", f.categoryId);
   if (f.paymentMethod) q = q.eq("payment_method", f.paymentMethod);
   if (f.minAmount && AMOUNT_RE.test(f.minAmount)) q = q.gte("amount", f.minAmount);
@@ -136,20 +142,25 @@ export type DashboardData = {
   byCategory: { category_id: string; name: string; color: string; total: string }[];
   cashflow: { month: string; income: string; expense: string }[];
   recent: Transaction[];
-  upcoming: Transaction[];
 };
 
-export async function getDashboard(supabase: SupabaseClient, period: YearMonth): Promise<DashboardData> {
+/**
+ * KPIs del período. Las deudas (tarjetas y préstamos) se calculan en
+ * services/obligations y se pasan aquí para obtener el patrimonio neto.
+ */
+export async function getDashboard(
+  supabase: SupabaseClient,
+  period: YearMonth,
+  debts: string[] = [],
+): Promise<DashboardData> {
   const { from, to } = monthRange(period);
 
-  const [accounts, totalsRes, catRes, flowRes, recent, upcoming] = await Promise.all([
+  const [accounts, totalsRes, catRes, flowRes, recent] = await Promise.all([
     getAccountsWithBalances(supabase),
     supabase.rpc("period_totals", { p_from: from, p_to: to }).single(),
     supabase.rpc("expenses_by_category", { p_from: from, p_to: to }),
     supabase.rpc("monthly_cashflow", { p_end: to, p_months: 6 }),
     getTransactions(supabase, { from, to, limit: 8, status: "confirmed" }),
-    // Pendientes más próximos (incluye vencidos) en orden ascendente.
-    getTransactions(supabase, { status: "pending", limit: 6, ascending: true }),
   ]);
 
   if (totalsRes.error) throw new Error(totalsRes.error.message);
@@ -160,8 +171,7 @@ export async function getDashboard(supabase: SupabaseClient, period: YearMonth):
   const income = money(totals.income);
   const expense = money(totals.expense);
 
-  // Fase 1: aún no existen módulos de tarjetas ni préstamos → deudas = 0.
-  const position = financialPosition({ accountBalances: accounts.map((a) => a.balance), debts: [] });
+  const position = financialPosition({ accountBalances: accounts.map((a) => a.balance), debts });
 
   return {
     period,
@@ -177,7 +187,6 @@ export async function getDashboard(supabase: SupabaseClient, period: YearMonth):
     byCategory: (catRes.data ?? []) as DashboardData["byCategory"],
     cashflow: (flowRes.data ?? []) as DashboardData["cashflow"],
     recent,
-    upcoming,
   };
 }
 

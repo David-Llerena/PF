@@ -75,3 +75,47 @@ export function formatDate(iso: string, style: "short" | "long" = "short"): stri
     year: style === "long" ? "numeric" : undefined,
   }).format(dt);
 }
+
+/* -------------------------------------------------------------------------- */
+/* Aritmética de fechas ISO (YYYY-MM-DD) sin zona horaria                      */
+/* -------------------------------------------------------------------------- */
+function parts(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return { y, m, d };
+}
+
+function toISO(y: number, m: number, d: number): string {
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+export function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/** Día `day` del mes indicado, ajustado al último día si el mes es más corto. */
+export function clampedDate(year: number, month: number, day: number): string {
+  return toISO(year, month, Math.min(day, daysInMonth(year, month)));
+}
+
+export function addDays(iso: string, days: number): string {
+  const { y, m, d } = parts(iso);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return toISO(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+}
+
+/** Suma meses conservando el día ancla (31 → 28/29/30 → vuelve a 31). */
+export function addMonthsAnchored(iso: string, months: number, anchorDay?: number): string {
+  const { y, m, d } = parts(iso);
+  const { year, month } = shiftMonth({ year: y, month: m }, months);
+  return clampedDate(year, month, anchorDay ?? d);
+}
+
+export function dayOf(iso: string): number {
+  return parts(iso).d;
+}
+
+export function diffDays(a: string, b: string): number {
+  const pa = parts(a);
+  const pb = parts(b);
+  return Math.round((Date.UTC(pa.y, pa.m - 1, pa.d) - Date.UTC(pb.y, pb.m - 1, pb.d)) / 86_400_000);
+}

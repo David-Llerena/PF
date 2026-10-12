@@ -5,7 +5,7 @@ import { useQuickAdd } from "@/components/forms/quick-add";
 import { cn } from "@/lib/utils";
 
 export function QuickActions() {
-  const { open } = useQuickAdd();
+  const { open, openPayments } = useQuickAdd();
   const items = [
     { label: "Gasto", icon: ArrowUpRight, tone: "bg-expense-soft text-expense", onClick: () => open({ kind: "expense" }) },
     { label: "Ingreso", icon: ArrowDownLeft, tone: "bg-income-soft text-income", onClick: () => open({ kind: "income" }) },
@@ -27,16 +27,16 @@ export function QuickActions() {
           {i.label}
         </button>
       ))}
-      <div
-        aria-disabled
-        title="Los pagos de tarjetas y préstamos llegan en la Fase 2"
-        className="flex cursor-not-allowed flex-col items-center gap-1.5 rounded-2xl border border-dashed bg-card/50 px-2 py-3 text-xs font-medium text-muted-foreground"
+      <button
+        type="button"
+        onClick={openPayments}
+        className="flex flex-col items-center gap-1.5 rounded-2xl border bg-card px-2 py-3 text-xs font-medium shadow-card transition-transform active:scale-[0.97]"
       >
-        <span className="flex size-10 items-center justify-center rounded-xl bg-muted">
+        <span className="flex size-10 items-center justify-center rounded-xl bg-primary-soft text-primary">
           <CreditCard className="size-5" />
         </span>
-        Pagos · F2
-      </div>
+        Pagar
+      </button>
     </div>
   );
 }

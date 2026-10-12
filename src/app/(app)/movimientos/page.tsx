@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Receipt } from "lucide-react";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { getAccountsWithBalances, getCategories, getTransactions, type TransactionFilters } from "@/services/finance";
+import { getCards } from "@/services/obligations";
 import { periodCashFlow } from "@/lib/finance/rules";
 import { monthLabel, monthRange, parseYearMonth } from "@/lib/dates";
 import { formatMoney, parseMoneyInput } from "@/lib/money";
@@ -17,7 +18,10 @@ export const metadata = { title: "Movimientos" };
 
 type SP = Record<string, string | undefined>;
 
-const KINDS = ["income", "expense", "transfer", "adjustment", "opening"] as const;
+const KINDS = [
+  "income", "expense", "transfer", "adjustment", "opening",
+  "card_payment", "card_opening", "loan_payment", "loan_disbursement",
+] as const;
 const STATUSES = ["pending", "confirmed", "void"] as const;
 
 function pick<T extends readonly string[]>(list: T, v?: string): T[number] | undefined {
@@ -46,18 +50,19 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
     includeVoid: status === "void",
     accountId: sp.cuenta,
     categoryId: sp.categoria,
-    paymentMethod: pick(["cash", "debit", "transfer", "other"] as const, sp.medio),
+    paymentMethod: pick(["cash", "debit", "transfer", "card", "other"] as const, sp.medio),
     minAmount: amountParam(sp.min),
     maxAmount: amountParam(sp.max),
     q: sp.q?.slice(0, 60),
     limit: 500,
   };
 
-  const [transactions, accounts, allAccounts, categories] = await Promise.all([
+  const [transactions, accounts, allAccounts, categories, cards] = await Promise.all([
     getTransactions(supabase, filters),
     getAccountsWithBalances(supabase),
     getAccountsWithBalances(supabase, { includeInactive: true }),
     getCategories(supabase, { includeInactive: true }),
+    getCards(supabase),
   ]);
 
   const flow = periodCashFlow(transactions);
@@ -110,7 +115,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
                 description="Prueba con otro mes o ajusta los filtros."
               />
             ) : (
-              <TransactionList transactions={transactions} accounts={accounts} categories={categories} />
+              <TransactionList transactions={transactions} accounts={accounts} categories={categories} cards={cards} />
             )}
           </CardContent>
         </Card>

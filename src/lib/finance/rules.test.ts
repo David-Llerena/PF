@@ -146,7 +146,7 @@ describe("validaciones", () => {
     });
     expect(r.success).toBe(false);
   });
-  it("gasto con tarjeta de crédito no se acepta en Fase 1", () => {
+  it("gasto con tarjeta de crédito exige indicar la tarjeta", () => {
     const r = expenseSchema.safeParse({
       description: "Cena",
       amount: "20",
@@ -156,5 +156,19 @@ describe("validaciones", () => {
       payment_method: "card",
     });
     expect(r.success).toBe(false);
+  });
+  it("consumo con tarjeta no descuenta de una cuenta (regla 1)", () => {
+    const id = "6f1c2c1e-2b8e-4f6a-9d3a-0e7c1b2a3d4e";
+    const r = expenseSchema.parse({
+      description: "Cena",
+      amount: "20",
+      category_id: id,
+      account_id: id,
+      credit_card_id: id,
+      occurred_on: "2026-10-01",
+      payment_method: "card",
+    });
+    expect(r.account_id).toBeNull();
+    expect(r.credit_card_id).toBe(id);
   });
 });

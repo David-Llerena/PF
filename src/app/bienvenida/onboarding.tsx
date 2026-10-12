@@ -8,26 +8,45 @@ import { Brand } from "@/components/layout/brand";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/primitives";
 import { AccountForm } from "@/components/forms/account-form";
+import { CardForm } from "@/components/cards/card-forms";
+import { RecurringForm } from "@/components/recurring/recurring-components";
 import { completeOnboarding, loadDemoData } from "@/actions/settings";
+import { FREQUENCY_LABEL } from "@/lib/finance/recurrence";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import type { AccountWithBalance, Institution } from "@/lib/types";
+import type { AccountWithBalance, CardSummary, Category, Institution, RecurringRule } from "@/lib/types";
 
-const STEPS = ["Bienvenida", "Primera cuenta", "Siguiente paso"];
+const STEPS = ["Inicio", "Cuentas", "Tarjetas", "Ingresos", "Listo"];
 
 export function Onboarding({
   name,
   institutions,
   accounts,
+  cards,
+  incomeRules,
+  categories,
 }: {
   name: string;
   institutions: Institution[];
   accounts: AccountWithBalance[];
+  cards: CardSummary[];
+  incomeRules: RecurringRule[];
+  categories: Category[];
 }) {
   const router = useRouter();
   const [step, setStep] = useState(accounts.length > 0 ? 1 : 0);
-  const [addingAnother, setAddingAnother] = useState(accounts.length === 0);
+  const [adding, setAdding] = useState<null | "account" | "card" | "income">(accounts.length === 0 ? "account" : null);
   const [pending, start] = useTransition();
+
+  function go(next: number) {
+    setStep(next);
+    setAdding(null);
+  }
+
+  function refreshAfterAdd() {
+    setAdding(null);
+    router.refresh();
+  }
 
   function finish(withDemo: boolean) {
     start(async () => {
@@ -56,11 +75,11 @@ export function Onboarding({
         </button>
       </div>
 
-      <ol className="mb-6 grid grid-cols-3 gap-2" aria-label="Progreso">
+      <ol className="mb-6 grid grid-cols-5 gap-1.5" aria-label="Progreso">
         {STEPS.map((s, i) => (
           <li key={s} className="flex flex-col gap-1.5">
             <span className={cn("h-1.5 rounded-full", i <= step ? "bg-primary" : "bg-muted")} />
-            <span className={cn("text-xs", i === step ? "font-medium" : "text-muted-foreground")}>{s}</span>
+            <span className={cn("text-[11px]", i === step ? "font-medium" : "text-muted-foreground")}>{s}</span>
           </li>
         ))}
       </ol>
@@ -74,89 +93,157 @@ export function Onboarding({
           <CardContent className="space-y-4">
             <ul className="space-y-3 text-sm">
               <Point>Registra el saldo que tienes <b>hoy</b> en cada cuenta. No necesitas cargar movimientos pasados.</Point>
-              <Point>Los saldos se calculan automáticamente con cada ingreso, gasto o transferencia.</Point>
+              <Point>Agrega tus tarjetas con la deuda actual: se registra como deuda inicial, no como gasto.</Point>
+              <Point>Configura tu sueldo como ingreso recurrente: no suma dinero hasta que lo registres como recibido.</Point>
               <Point>Todo se ingresa manualmente: no conectamos con tu banco.</Point>
             </ul>
-            <Button size="lg" className="w-full" onClick={() => setStep(1)}>
+            <Button size="lg" className="w-full" onClick={() => go(1)}>
               Empezar <ArrowRight />
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {step === 1 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Wallet className="size-5 text-primary" /> Tus cuentas
-            </CardTitle>
-            <CardDescription>Agrega tus bancos, efectivo o billeteras con su saldo actual.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {accounts.length > 0 && (
-              <ul className="space-y-2">
-                {accounts.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between rounded-xl bg-muted px-3 py-2 text-sm">
-                    <span className="flex items-center gap-2">
-                      <span className="size-2.5 rounded-full" style={{ backgroundColor: a.color }} />
-                      {a.name}
-                    </span>
-                    <span className="tabular font-medium">{formatMoney(a.balance)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {addingAnother ? (
-              <AccountForm
-                institutions={institutions}
-                isFirst={accounts.length === 0}
-                onDone={() => {
-                  setAddingAnother(false);
-                  router.refresh();
-                }}
-              />
-            ) : (
-              <div className="flex flex-col gap-2">
-                <Button variant="outline" onClick={() => setAddingAnother(true)}>
-                  Agregar otra cuenta
-                </Button>
-                <Button size="lg" onClick={() => setStep(2)}>
-                  Continuar <ArrowRight />
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {step === 2 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">¡Todo listo para empezar!</CardTitle>
-            <CardDescription>Ya puedes registrar ingresos, gastos y transferencias.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Upcoming icon={<CreditCard />} title="Tarjetas de crédito" text="Cupo, consumos, compras diferidas y pagos." />
-              <Upcoming icon={<Repeat />} title="Ingresos y pagos recurrentes" text="Sueldo, suscripciones y vencimientos." />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Estos pasos se habilitarán en la Fase 2. Por ahora, si recibes tu sueldo, regístralo como ingreso y
-              márcalo como <b>pendiente</b> hasta que llegue: así no se suma a tu saldo antes de tiempo.
-            </p>
-            <Button size="lg" className="w-full" onClick={() => finish(false)} loading={pending}>
-              Ir a mi resumen <ArrowRight />
             </Button>
             {accounts.length === 0 && (
               <Button variant="ghost" className="w-full" onClick={() => finish(true)} disabled={pending}>
-                <Sparkles /> Explorar con datos de demostración
+                <Sparkles /> Solo quiero explorar con datos de demostración
               </Button>
             )}
           </CardContent>
         </Card>
       )}
+
+      {step === 1 && (
+        <StepCard
+          icon={<Wallet />}
+          title="Tus cuentas"
+          description="Bancos, efectivo o billeteras con su saldo actual."
+          items={accounts.map((a) => ({ id: a.id, color: a.color, label: a.name, value: formatMoney(a.balance) }))}
+          adding={adding === "account"}
+          addLabel={accounts.length ? "Agregar otra cuenta" : "Agregar cuenta"}
+          onAdd={() => setAdding("account")}
+          onNext={() => go(2)}
+          nextDisabled={accounts.length === 0}
+        >
+          <AccountForm institutions={institutions} isFirst={accounts.length === 0} onDone={refreshAfterAdd} />
+        </StepCard>
+      )}
+
+      {step === 2 && (
+        <StepCard
+          icon={<CreditCard />}
+          title="Tarjetas de crédito"
+          description="Opcional. Cupo, fechas de corte y pago, y la deuda que tienes hoy."
+          items={cards.map((c) => ({ id: c.id, color: c.color, label: c.name, value: `Deuda ${formatMoney(c.debt)}` }))}
+          adding={adding === "card"}
+          addLabel={cards.length ? "Agregar otra tarjeta" : "Agregar tarjeta"}
+          onAdd={() => setAdding("card")}
+          onNext={() => go(3)}
+          nextLabel={cards.length ? "Continuar" : "No tengo tarjetas · continuar"}
+        >
+          <CardForm institutions={institutions} onDone={refreshAfterAdd} />
+        </StepCard>
+      )}
+
+      {step === 3 && (
+        <StepCard
+          icon={<Repeat />}
+          title="Ingreso recurrente"
+          description="Opcional. Tu sueldo u otro ingreso periódico, para planificar tus pagos."
+          items={incomeRules.map((r) => ({
+            id: r.id,
+            color: "#16a34a",
+            label: `${r.name} · ${FREQUENCY_LABEL[r.frequency]}`,
+            value: formatMoney(r.amount),
+          }))}
+          adding={adding === "income"}
+          addLabel={incomeRules.length ? "Agregar otro ingreso" : "Agregar ingreso recurrente"}
+          onAdd={() => setAdding("income")}
+          onNext={() => go(4)}
+          nextLabel={incomeRules.length ? "Continuar" : "Omitir este paso"}
+        >
+          <RecurringForm kind="income" accounts={accounts} cards={cards} categories={categories} onDone={refreshAfterAdd} />
+        </StepCard>
+      )}
+
+      {step === 4 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl">¡Todo listo!</CardTitle>
+            <CardDescription>Ya puedes registrar gastos, consumos con tarjeta, pagos y transferencias.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Usa el botón <b>+</b> para registrar en segundos. En <b>Recurrentes</b> puedes agregar Netflix, internet,
+              teléfono o gimnasio; en <b>Préstamos</b>, tus deudas con su tabla de cuotas.
+            </p>
+            <Button size="lg" className="w-full" onClick={() => finish(false)} loading={pending}>
+              Ir a mi resumen <ArrowRight />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </main>
+  );
+}
+
+function StepCard({
+  icon,
+  title,
+  description,
+  items,
+  adding,
+  addLabel,
+  onAdd,
+  onNext,
+  nextLabel = "Continuar",
+  nextDisabled,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  items: { id: string; color: string; label: string; value: string }[];
+  adding: boolean;
+  addLabel: string;
+  onAdd: () => void;
+  onNext: () => void;
+  nextLabel?: string;
+  nextDisabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-xl [&_svg]:size-5 [&_svg]:text-primary">
+          {icon} {title}
+        </CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {items.length > 0 && (
+          <ul className="space-y-2">
+            {items.map((i) => (
+              <li key={i.id} className="flex items-center justify-between gap-2 rounded-xl bg-muted px-3 py-2 text-sm">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: i.color }} />
+                  <span className="truncate">{i.label}</span>
+                </span>
+                <span className="tabular shrink-0 font-medium">{i.value}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {adding ? (
+          children
+        ) : (
+          <div className="flex flex-col gap-2">
+            <Button variant="outline" onClick={onAdd}>
+              {addLabel}
+            </Button>
+            <Button size="lg" onClick={onNext} disabled={nextDisabled}>
+              {nextLabel} <ArrowRight />
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -168,20 +255,5 @@ function Point({ children }: { children: React.ReactNode }) {
       </span>
       <span>{children}</span>
     </li>
-  );
-}
-
-function Upcoming({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-dashed px-3 py-2.5">
-      <span className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground [&_svg]:size-4">
-        {icon}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{title}</p>
-        <p className="truncate text-xs text-muted-foreground">{text}</p>
-      </div>
-      <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Fase 2</span>
-    </div>
   );
 }

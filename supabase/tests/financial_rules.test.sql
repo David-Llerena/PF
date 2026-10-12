@@ -20,7 +20,7 @@ declare
 begin
   -- Perfil y categorías creados por el trigger de alta
   assert (select count(*) from profiles) = 1, 'perfil no creado';
-  assert (select count(*) from transaction_categories) = 19, 'categorías iniciales incorrectas';
+  assert (select count(*) from transaction_categories) = 20, 'categorías iniciales incorrectas';
 
   v_bank := create_account('Ahorros', 'savings', null, 'USD', '#7c3aed', 'landmark', true, 1000.10, '2026-09-01');
   v_cash := create_account('Efectivo', 'cash', null, 'USD', '#16a34a', 'wallet', false, 0, '2026-09-01');

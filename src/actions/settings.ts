@@ -62,7 +62,7 @@ export async function setCategoryActive(input: unknown, active: boolean): Promis
 export async function loadDemoData(): Promise<ActionResult> {
   return runAction(async () => {
     const { supabase } = await requireUser();
-    const { error } = await supabase.rpc("load_demo_data");
+    const { error } = await supabase.rpc("load_demo_data_all");
     if (error) return dbError(error);
     revalidatePath("/", "layout");
     return { ok: true, message: "Datos de demostración cargados" };

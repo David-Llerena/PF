@@ -4,7 +4,7 @@
  * - Navegación: siempre red; si no hay conexión, muestra /offline.
  * - NUNCA se cachean páginas con datos financieros ni respuestas de Supabase.
  */
-const VERSION = "v1";
+const VERSION = "v2";
 const STATIC_CACHE = `static-${VERSION}`;
 const OFFLINE_URL = "/offline";
 

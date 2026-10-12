@@ -4,6 +4,8 @@ import { Suspense } from "react";
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  ChevronRight,
+  TrendingUp,
   CalendarClock,
   Info,
   PiggyBank,
@@ -13,10 +15,14 @@ import {
 } from "lucide-react";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { getCategories, getDashboard, getProfile } from "@/services/finance";
+import { getObligations } from "@/services/obligations";
+import { getProjection, getReservedTotal } from "@/services/planning";
+import { unreservedAvailable } from "@/lib/finance/planning";
+import { ObligationList } from "@/components/obligations/obligation-list";
 import { formatMoney, money, sumMoney } from "@/lib/money";
 import { percentOf } from "@/lib/finance/rules";
-import { monthLabel, parseYearMonth, formatDate, todayISO } from "@/lib/dates";
-import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, EmptyState } from "@/components/ui/primitives";
+import { monthLabel, parseYearMonth } from "@/lib/dates";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, EmptyState } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { MonthPicker } from "@/components/dashboard/month-picker";
 import { CashflowChart } from "@/components/dashboard/cashflow-chart";
@@ -36,16 +42,24 @@ export default async function DashboardPage({
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) redirect("/login");
 
-  const [profile, data, categories] = await Promise.all([
+  const [profile, ob, categories, reserved, projection] = await Promise.all([
     getProfile(supabase),
-    getDashboard(supabase, period),
+    getObligations(supabase, 30),
     getCategories(supabase),
+    getReservedTotal(supabase),
+    getProjection(supabase),
   ]);
+  const data = await getDashboard(supabase, period, [ob.debts]);
+  const cardDebt = sumMoney(ob.cards.map((c) => (money(c.debt).isNegative() ? "0" : c.debt))).toFixed(2);
+  const loanDebt = sumMoney(ob.loans.map((l) => l.outstanding)).toFixed(2);
+  const dueSoon = sumMoney(ob.obligations.filter((o) => o.direction === "out").map((o) => o.amount)).toFixed(2);
+  const dueCount = ob.obligations.filter((o) => o.direction === "out").length;
 
   if (profile && !profile.onboarding_completed && data.accounts.length === 0) redirect("/bienvenida");
 
   const firstName = profile?.full_name?.split(" ")[0];
   const savings = sumMoney(data.accounts.filter((a) => a.account_type === "savings").map((a) => a.balance));
+  const unreserved = unreservedAvailable(data.available, reserved);
   const net = money(data.monthlyNet);
   const totalExpense = money(data.expense);
   const hasDemo = data.accounts.some((a) => a.is_demo);
@@ -106,6 +120,33 @@ export default async function DashboardPage({
 
       <QuickActions />
 
+      <Link
+        href="/reportes"
+        className="group flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-card transition-colors hover:border-primary/40 sm:flex-row sm:items-center"
+      >
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary">
+          <TrendingUp className="size-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm text-muted-foreground">
+            Al cierre de {monthLabel(projection.monthLabel).toLowerCase()} te quedarían
+          </span>
+          <span
+            className={cn(
+              "tabular block text-xl font-semibold",
+              money(projection.result).isNegative() ? "text-destructive" : "text-foreground",
+            )}
+          >
+            {formatMoney(projection.result)}
+            {projection.hasEstimates && <span className="ml-2 text-xs font-normal text-muted-foreground">estimado</span>}
+          </span>
+        </span>
+        <span className="text-sm text-muted-foreground">
+          Sin reservar hoy <b className="tabular text-foreground">{formatMoney(unreserved)}</b>
+          <ChevronRight className="ml-1 inline size-4 transition-transform group-hover:translate-x-0.5" />
+        </span>
+      </Link>
+
       {/* ------------------------------ KPIs del período ------------------------------ */}
       <section aria-label={`Indicadores de ${monthLabel(period)}`} className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Kpi
@@ -130,25 +171,25 @@ export default async function DashboardPage({
           foot="Ingresos − gastos confirmados"
         />
         <Kpi
-          label="Pagos pendientes"
-          value={formatMoney(data.pendingExpense)}
+          label="Pagos próximos (30 días)"
+          value={formatMoney(dueSoon)}
           icon={<CalendarClock />}
           tone="info"
-          foot="Gastos programados del mes"
+          foot={dueCount === 0 ? "Sin obligaciones próximas" : `${dueCount} obligaciones · incluye vencidas`}
         />
         <Kpi
-          label="En cuentas de ahorro"
-          value={formatMoney(savings.toFixed(2))}
+          label="Reservado en metas"
+          value={formatMoney(reserved)}
           icon={<PiggyBank />}
           tone="primary"
-          foot="Metas de ahorro: Fase 3"
+          foot={`En cuentas de ahorro ${formatMoney(savings.toFixed(2))}`}
         />
         <Kpi
           label="Deudas pendientes"
           value={formatMoney(data.debts)}
           icon={<Receipt />}
           tone="neutral"
-          foot="Tarjetas y préstamos: Fase 2"
+          foot={`Tarjetas ${formatMoney(cardDebt)} · préstamos ${formatMoney(loanDebt)}`}
         />
       </section>
 
@@ -225,7 +266,7 @@ export default async function DashboardPage({
                 description="Registra tu primer ingreso o gasto con el botón +."
               />
             ) : (
-              <TransactionList transactions={data.recent} accounts={data.accounts} categories={categories} />
+              <TransactionList transactions={data.recent} accounts={data.accounts} categories={categories} cards={ob.cards} />
             )}
           </CardContent>
         </Card>
@@ -233,42 +274,19 @@ export default async function DashboardPage({
         <Card className="min-w-0 lg:col-span-2">
           <CardHeader>
             <CardTitle>Próximas obligaciones</CardTitle>
-            <CardDescription>Ingresos y pagos pendientes de confirmar</CardDescription>
+            <CardDescription>Próximos 30 días y vencidos</CardDescription>
           </CardHeader>
           <CardContent>
-            {data.upcoming.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">No tienes movimientos pendientes.</p>
+            {ob.obligations.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No tienes pagos ni ingresos esperados en los próximos 30 días.
+              </p>
             ) : (
-              <ul className="space-y-2">
-                {data.upcoming.map((t) => {
-                  const overdue = t.occurred_on < todayISO();
-                  return (
-                    <li key={t.id} className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 px-3 py-2.5">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{t.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(t.occurred_on, "long")} · {t.account?.name}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-0.5">
-                        <span
-                          className={cn(
-                            "tabular text-sm font-semibold",
-                            t.kind === "income" ? "text-income" : "text-expense",
-                          )}
-                        >
-                          {t.kind === "income" ? "+" : "−"}
-                          {formatMoney(t.amount)}
-                        </span>
-                        {overdue && <Badge tone="expense">Vencido</Badge>}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+              <ObligationList items={ob.obligations} limit={7} />
             )}
             <p className="mt-4 text-xs text-muted-foreground">
-              Vencimientos de tarjetas, préstamos y suscripciones se sumarán aquí en la Fase 2.
+              Tarjetas (pago del período estimado), cuotas de préstamos, recurrentes y movimientos pendientes. Cada
+              obligación aparece una sola vez.
             </p>
           </CardContent>
         </Card>

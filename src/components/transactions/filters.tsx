@@ -14,6 +14,8 @@ const KIND_TABS = [
   { v: "expense", label: "Gastos" },
   { v: "income", label: "Ingresos" },
   { v: "transfer", label: "Transferencias" },
+  { v: "card_payment", label: "Pagos de tarjeta" },
+  { v: "loan_payment", label: "Abonos a préstamos" },
   { v: "adjustment", label: "Ajustes" },
 ];
 
@@ -125,7 +127,7 @@ export function TransactionFilters({
           <Field label="Medio de pago" htmlFor="f-medio">
             <NativeSelect id="f-medio" value={params.get("medio") ?? ""} onChange={(e) => update({ medio: e.target.value || null })}>
               <option value="">Todos</option>
-              {(["cash", "debit", "transfer", "other"] as PaymentMethod[]).map((m) => (
+              {(["cash", "debit", "transfer", "card", "other"] as PaymentMethod[]).map((m) => (
                 <option key={m} value={m}>
                   {PAYMENT_METHOD_LABEL[m]}
                 </option>

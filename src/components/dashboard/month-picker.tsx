@@ -4,7 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { currentYearMonth, monthLabel, shiftMonth, type YearMonth } from "@/lib/dates";
 
-export function MonthPicker({ value }: { value: YearMonth }) {
+export function MonthPicker({ value, allowFuture = false }: { value: YearMonth; allowFuture?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -44,7 +44,7 @@ export function MonthPicker({ value }: { value: YearMonth }) {
         className={btn}
         onClick={() => go(shiftMonth(value, 1))}
         aria-label="Mes siguiente"
-        disabled={isCurrent}
+        disabled={isCurrent && !allowFuture}
       >
         <ChevronRight className="size-4" />
       </button>

@@ -8,6 +8,7 @@ import {
   CreditCard,
   HandCoins,
   LayoutDashboard,
+  LayoutGrid,
   LineChart,
   LogOut,
   PiggyBank,
@@ -23,23 +24,22 @@ import { useQuickAdd } from "@/components/forms/quick-add";
 import { signOut } from "@/actions/auth";
 import { cn } from "@/lib/utils";
 
-type NavItem = { href: string; label: string; icon: React.ElementType; phase?: number };
+type NavItem = { href: string; label: string; icon: React.ElementType };
 
 const MAIN_NAV: NavItem[] = [
   { href: "/", label: "Inicio", icon: LayoutDashboard },
   { href: "/movimientos", label: "Movimientos", icon: ArrowLeftRight },
   { href: "/cuentas", label: "Cuentas", icon: Wallet },
+  { href: "/tarjetas", label: "Tarjetas", icon: CreditCard },
+  { href: "/prestamos", label: "Préstamos", icon: HandCoins },
+  { href: "/recurrentes", label: "Recurrentes", icon: Repeat },
 ];
 
-/** Módulos planificados: visibles para orientar, pero sin simular que funcionan. */
-const UPCOMING_NAV: NavItem[] = [
-  { href: "#", label: "Tarjetas", icon: CreditCard, phase: 2 },
-  { href: "#", label: "Préstamos", icon: HandCoins, phase: 2 },
-  { href: "#", label: "Suscripciones", icon: Repeat, phase: 2 },
-  { href: "#", label: "Presupuestos", icon: PiggyBank, phase: 3 },
-  { href: "#", label: "Metas", icon: Target, phase: 3 },
-  { href: "#", label: "Calendario", icon: CalendarDays, phase: 3 },
-  { href: "#", label: "Reportes", icon: LineChart, phase: 3 },
+const PLANNING_NAV: NavItem[] = [
+  { href: "/presupuestos", label: "Presupuestos", icon: PiggyBank },
+  { href: "/metas", label: "Metas de ahorro", icon: Target },
+  { href: "/calendario", label: "Calendario", icon: CalendarDays },
+  { href: "/reportes", label: "Reportes", icon: LineChart },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -79,44 +79,11 @@ export function AppShell({
         </div>
 
         <nav className="mt-4 flex-1 overflow-y-auto px-3" aria-label="Principal">
-          <ul className="space-y-0.5">
-            {MAIN_NAV.map((item) => (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  aria-current={isActive(pathname, item.href) ? "page" : undefined}
-                  className={cn(
-                    "flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                    isActive(pathname, item.href) && "bg-primary-soft text-accent-foreground hover:bg-primary-soft",
-                  )}
-                >
-                  <item.icon className="size-[18px]" />
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-
-          <p className="mb-1 mt-6 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-            Próximamente
+          <NavList items={MAIN_NAV} pathname={pathname} />
+          <p className="mb-1 mt-5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+            Planificación
           </p>
-          <ul className="space-y-0.5">
-            {UPCOMING_NAV.map((item) => (
-              <li key={item.label}>
-                <span
-                  aria-disabled
-                  title={`Disponible en la Fase ${item.phase}`}
-                  className="flex h-9 cursor-not-allowed items-center gap-3 rounded-xl px-3 text-sm text-muted-foreground/60"
-                >
-                  <item.icon className="size-[18px]" />
-                  {item.label}
-                  <span className="ml-auto rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium">
-                    Fase {item.phase}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
+          <NavList items={PLANNING_NAV} pathname={pathname} />
         </nav>
 
         <div className="border-t p-3">
@@ -187,16 +154,38 @@ export function AppShell({
               <Plus className="size-6" />
             </button>
           </li>
-          <BottomLink href="/cuentas" label="Cuentas" icon={Wallet} active={isActive(pathname, "/cuentas")} />
+          <BottomLink href="/tarjetas" label="Tarjetas" icon={CreditCard} active={isActive(pathname, "/tarjetas")} />
           <BottomLink
-            href="/configuracion"
-            label="Ajustes"
-            icon={Settings}
-            active={isActive(pathname, "/configuracion")}
+            href="/mas"
+            label="Más"
+            icon={LayoutGrid}
+            active={["/mas", "/cuentas", "/prestamos", "/recurrentes", "/configuracion", "/presupuestos", "/metas", "/calendario", "/reportes"].some((p) => isActive(pathname, p))}
           />
         </ul>
       </nav>
     </div>
+  );
+}
+
+function NavList({ items, pathname }: { items: NavItem[]; pathname: string }) {
+  return (
+    <ul className="space-y-0.5">
+      {items.map((item) => (
+        <li key={item.href}>
+          <Link
+            href={item.href}
+            aria-current={isActive(pathname, item.href) ? "page" : undefined}
+            className={cn(
+              "flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+              isActive(pathname, item.href) && "bg-primary-soft text-accent-foreground hover:bg-primary-soft",
+            )}
+          >
+            <item.icon className="size-[18px]" />
+            {item.label}
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 
