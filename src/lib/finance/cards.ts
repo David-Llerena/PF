@@ -77,6 +77,7 @@ export function statementEstimate(params: {
   cycle: { start: string; end: string };
   movements: CardMovement[];
   installments: Installment[];
+  /** Pagos hechos después del vencimiento anterior (abonan a este período). */
   paymentsSinceCut: MoneyInput[];
 }) {
   const confirmed = params.movements.filter((m) => m.status === "confirmed");

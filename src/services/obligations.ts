@@ -76,9 +76,12 @@ export async function getCards(
       movements: own,
       installments: installments.filter((i) => i.purchase.credit_card_id === card.id),
       paymentsSinceCut: own
-        .filter((m) => m.kind === "card_payment" && m.occurred_on > st.cut)
+        .filter((m) => m.kind === "card_payment" && m.occurred_on > st.prevDue)
         .map((m) => m.amount),
     });
+    // El pago del período nunca puede superar la deuda total.
+    const cap = money(debt).isNegative() ? money(0) : money(debt);
+    if (money(estimate.remaining).gt(cap)) estimate.remaining = cap.toFixed(2);
     return {
       ...card,
       debt,

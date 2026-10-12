@@ -109,12 +109,18 @@ export async function getGoals(supabase: SupabaseClient) {
 }
 
 export async function getReservedTotal(supabase: SupabaseClient): Promise<string> {
-  const { data, error } = await supabase
-    .from("goal_balances")
-    .select("allocated:allocated::text, goal:savings_goals!inner(status)")
-    .eq("goal.status", "active");
-  if (error) throw new Error(error.message);
-  return sumMoney((data ?? []).map((d) => d.allocated as string)).toFixed(2);
+  // goal_balances es una vista: PostgREST no puede embeber savings_goals desde ella,
+  // así que se consultan por separado y se cruzan aquí.
+  const [goalsRes, balRes] = await Promise.all([
+    supabase.from("savings_goals").select("id").eq("status", "active"),
+    supabase.from("goal_balances").select("goal_id, allocated:allocated::text"),
+  ]);
+  if (goalsRes.error) throw new Error(goalsRes.error.message);
+  if (balRes.error) throw new Error(balRes.error.message);
+  const active = new Set((goalsRes.data ?? []).map((g) => g.id as string));
+  return sumMoney(
+    (balRes.data ?? []).filter((b) => active.has(b.goal_id as string)).map((b) => b.allocated as string),
+  ).toFixed(2);
 }
 
 /* -------------------------------------------------------------------------- */

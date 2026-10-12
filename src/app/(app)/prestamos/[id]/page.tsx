@@ -47,7 +47,7 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
             <p className="text-sm text-muted-foreground">
               {loan.lender}
               {loan.loan_type === "amortized"
-                ? ` · ${loan.annual_rate}% anual · ${LOAN_FREQUENCY_LABEL[loan.frequency!]} · ${loan.installments_count} cuotas`
+                ? ` · ${Number(loan.annual_rate)}% anual · ${LOAN_FREQUENCY_LABEL[loan.frequency!]} · ${loan.installments_count} cuotas`
                 : " · Deuda simple"}
             </p>
             {loan.notes && <p className="mt-1 text-sm italic text-muted-foreground">{loan.notes}</p>}

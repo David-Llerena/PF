@@ -68,7 +68,7 @@ export default async function LoansPage() {
                       <div className="min-w-0">
                         <p className="truncate font-medium">{l.name}</p>
                         <p className="truncate text-xs text-muted-foreground">
-                          {l.lender} · {l.loan_type === "simple" ? "Deuda simple" : `${l.annual_rate}% anual`}
+                          {l.lender} · {l.loan_type === "simple" ? "Deuda simple" : `${Number(l.annual_rate)}% anual`}
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
